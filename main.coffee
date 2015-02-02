@@ -25,10 +25,10 @@ FONT_SIZE_TIME = 100
 # アセットの読み込みパス
 ASSETS = {
   "iwiImage":  "./assets/iwi60.png"
-  "bgm":       "./assets/main.mp3"
+  "bgm":       "./assets/boss.mp3"
   "pinponSE":  "./assets/explosion.mp3"
   "booSE":     "./assets/miss.mp3"
-  "clearSE":   "./assets/explosion.mp3"
+  "end":       "./assets/end.mp3"
 }
 
 tm.main ->
@@ -38,7 +38,7 @@ tm.main ->
   # 画面サイズを自動にウィンドウに合わせる
   app.fitWindow()
   app.background = "rgba(250,250,250,1.0)"
-  # app.replaceScene TitleScene()
+  app.replaceScene TitleScene()
 
   # ローディング
   # 幅、高さ、アセットパス、ローディング完了後の画面
@@ -46,7 +46,7 @@ tm.main ->
     width: SCREEN_WIDTH
     height: SCREEN_HEIGHT
     assets: ASSETS
-    nextScene: GameScene
+    nextScene: TitleScene
   })
   # シーン切り替え
   app.replaceScene loading
@@ -57,11 +57,10 @@ tm.define "GameScene",
   init: ->
     @superInit()
 
-    # tm.asset.AssetManager.get("bgm").play()
+    tm.asset.AssetManager.get("bgm").play()
 
     self = this
     bomCount = 0
-
 
     # ブロックの集合
     @blockGroup = tm.app.CanvasElement()
@@ -138,6 +137,8 @@ tm.define "GameScene",
       bgColor: "#888"
     }).addChildTo this
     titleBtn.position.set 180, 880
+    titleBtn.onpointingend = ->
+      self.app.replaceScene TitleScene()
 
     # リスタートボタン
     restartBtn = tm.app.FlatButton({
@@ -147,16 +148,26 @@ tm.define "GameScene",
       bgColor: "#888"
     }).addChildTo(this)
     restartBtn.position.set 500, 880
+    restartBtn.onpointingstart = ->
+      self.app.replaceScene GameScene()
 
   update: (app) ->
     time = LIMIT_TIME - parseInt((app.frame / app.fps) * 100, 10)
     # タイムアップ後、リザルト画面へ
     if time < 0
-      time = LIMIT_TIME
+      # todo:無理やりオブジェクトを切り開いたのでオブジェクト的な処理を
+      @app.replaceScene ResultScene @children[1].text
+      # 結果画面になるとき曲を止める
+      tm.asset.AssetManager.get("bgm").stop()
+      tm.asset.AssetManager.get("end").clone().play()
     # 文字列へ置換
     timeStr = time.toString()
     # ミリ秒以下に.を追加
     @timerLabel.text = timeStr.replace(/(\d)(?=(\d\d)+$)/g, "$1.")
+  # このシーンが呼び出された時
+  onenter: (e) ->
+    e.app.pushScene CountdownScene()
+    @onenter = null
 
 tm.define "Block",
   superClass: "tm.app.Shape"
@@ -184,3 +195,151 @@ tm.define "Block",
   imgDisable: ->
     @isVisible = false
     @blockImage.setVisible false
+
+# タイトルシーン
+tm.define "TitleScene",
+  superClass: "tm.app.Scene"
+  init: ->
+    @superInit()
+    # fromJSON: jsonデータから自身のプロパティや子要素を生成
+    @fromJSON({
+      children: [
+        {
+          type: "Label"
+          name: "titleLabel"
+          text: "IWI BOMBER!!!"
+          x: SCREEN_CENTER_X
+          y: 200
+          fillStyle: "#444"
+          fontSize: 60
+          fontFamily: FONT_FAMILY_FLAT
+          align: "center"
+          baseline: "middle"
+        },
+        {
+          type: "Label"
+          name: "nextLabel"
+          text: "タッチして開始"
+          x: SCREEN_CENTER_X
+          y: 650
+          fillStyle: "#444"
+          fontSize: 26
+          fontFamily: FONT_FAMILY_FLAT
+          align: "center"
+          baseline: "middle"
+        }
+      ]
+    })
+    # アニメーション
+    @nextLabel.tweener
+      .fadeOut 500
+      .fadeIn 1000
+      .setLoop true
+  onpointingstart: ->
+    @app.replaceScene GameScene()
+
+# 結果画面
+tm.define "ResultScene",
+  superClass: "tm.app.Scene"
+  # 爆破数を受け取る
+  init: (param) ->
+    @superInit()
+    @fromJSON({
+      children: [
+        {
+          type: "Label"
+          name: "hitLabel"
+          text: "0"
+          x: SCREEN_CENTER_X
+          y: 320
+          fillStyle: "#888"
+          fontSize: 100
+          fontFamily: FONT_FAMILY_FLAT
+          align: "center"
+        },
+        {
+          type: "FlatButton"
+          name: "tweetButton"
+          x: SCREEN_CENTER_X - 160
+          y: 650
+          init: [
+            {
+              text: "TWEET"
+              bgColor: "hsl(240, 80%, 70%)"
+            }
+          ]
+        },
+        {
+          type: "FlatButton"
+          name: "backButton"
+          init: [
+            {
+              text: "もう一回"
+              bgColor: "hsl(240, 0%, 70%)"
+            }
+          ]
+          x: SCREEN_CENTER_X + 160
+          y: 650
+        }
+      ]
+    })
+
+    # 引数で渡された爆破数をセット
+    @hitLabel.text = "#{param}回\nまだまだですね"
+
+    # tweetボタンのクリック処理
+    @tweetButton.onclick = ->
+      twitterURL = tm.social.Twitter.createURL({
+        type: "tweet"
+        text: "例のあの人を#{param}回タッチしました"
+        hashtags: "iwi-bomber"
+        url: window.document.location.href
+      })
+      window.open twitterURL
+    self = this
+    # バックボタンでタイトル画面に遷移
+    @backButton.onpointingstart = ->
+      self.app.replaceScene TitleScene()
+
+tm.define "CountdownScene",
+  superClass: "tm.app.Scene"
+  init: ->
+    @superInit()
+    self = this
+
+    filter = tm.app.Shape(SCREEN_WIDTH, SCREEN_HEIGHT)
+      .addChildTo this
+    filter.origin.set 0, 0
+    filter.canvas.clearColor "rgba(250, 250, 250, 1.0"
+
+    label = tm.app.Label(3).addChildTo this
+    label
+      .setPosition SCREEN_CENTER_X, SCREEN_CENTER_Y
+      .setFillStyle "#888"
+      .setFontFamily FONT_FAMILY_FLAT
+      .setFontSize 512
+      .setAlign "center"
+      .setBaseline "middle"
+
+    label.tweener
+      .set({
+        scaleX: 0.5
+        scaleY: 0.5
+        text: 3
+      })
+      .scale 1
+      .set({
+        scaleX: 0.5
+        scaleY: 0.5
+        text: 2
+      })
+      .scale 1
+      .set({
+        scaleX: 0.5
+        scaleY: 0.5
+        text: 1
+      })
+      .scale 1
+      .call ->
+        self.app.frame = 0
+        self.app.popScene()
