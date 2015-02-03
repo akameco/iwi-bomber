@@ -302,7 +302,7 @@
 	      twitterURL = tm.social.Twitter.createURL({
 	        type: "tweet",
 	        text: "例のあの人を" + param + "回タッチしました",
-	        hashtags: "iwi-bomber",
+	        hashtags: "iwi_bomber",
 	        url: window.document.location.href
 	      });
 	      return window.open(twitterURL);
