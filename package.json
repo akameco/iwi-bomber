@@ -9,9 +9,9 @@
   "author": "akameco",
   "license": "MIT",
   "devDependencies": {
-    "coffee-loader": "^0.7.2",
+    "coffee-loader": "^0.9.0",
     "coffee-script": "^1.9.0",
-    "webpack": "^1.5.3",
-    "webpack-dev-server": "^1.7.0"
+    "webpack": "^3.11.0",
+    "webpack-dev-server": "^2.11.1"
   }
 }
